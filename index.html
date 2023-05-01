@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>LCB-Calculator</title>
+	<meta charset="utf-8">
+<style>
+.box
+{
+	width:190px;
+	height:350px;
+	background-color:cyan;
+	border: 3px solid black;
+	float:left;
+	padding-left:10px;
+	margin: 0px 10px 10px 0px;
+}
+
+input
+{
+	width:45px;
+}
+
+</style>
+</head>
+
+<body>
+<H2>Limbus Company Battle Calculator</H2>
+<div class="box">
+<H3>You</H3>
+<table cellpadding=5px>
+<tr>
+<td>Resistance</td>
+<td><input id="userResist" type="number" value="1" min="0"></td>
+</tr>
+<tr>
+<td>Skill Power</td>
+<td><input id="userSkillPower" type="number" value="0"></td>
+</tr>
+<tr>
+<td>Coin Power</td>
+<td><input id="userCoinPower" type="number" value="0"></td>
+</tr>
+<tr>
+<td>Coin Number</td>
+<td><input id="userCoinNumber" type="number" value="1" min="0"></td>
+</tr>
+<tr>
+<td>Sanity (SP)</td>
+<td><input id="userSanity" type="number" min="-45" max="45" value="0"></td>
+</tr>
+<tr>
+<td>Power Adjustment</td>
+<td><input id="userAdjust" type="number" value="0"></td>
+</tr>
+</table>
+</div>
+
+<div class="box">
+<H3>Enemy</H3>
+<table cellpadding=5px>
+<tr>
+<td>Resistance</td>
+<td><input id="enemyResist" type="number" value="1" min="0"></td>
+</tr>
+<tr>
+<td>Skill Power</td>
+<td><input id="enemySkillPower" type="number" value="0"></td>
+</tr>
+<tr>
+<td>Coin Power</td>
+<td><input id="enemyCoinPower" type="number" value="0"></td>
+</tr>
+<tr>
+<td>Coin Number</td>
+<td><input id="enemyCoinNumber" type="number" value="1" min="0"></td>
+</tr>
+<tr>
+<td>Sanity (SP)</td>
+<td><input id="enemySanity" type="number" min="-45" max="45" value="0"></td>
+</tr>
+<tr>
+<td>Power Adjustment</td>
+<td><input id="enemyAdjust" type="number" value="0"></td>
+</tr>
+</table>
+</div>
+
+<div style="clear:both;">
+<button onclick="main();">confirm</button>
+<table style="width:350px;border-collapse:collapse;margin: 20px 0px 0px 0px;" cellpadding=5px>
+<tr style="border:1px solid black">
+<td>Winning Percentage</td>
+<td style="text-align:center"><sapn id="prob">0.00%</sapn></td>
+</tr>
+<tr style="border:1px solid black">
+<td>Expected Damage Dealt</td>
+<td style="text-align:center"><sapn id="dealt">0.00</sapn></td>
+</tr>
+<tr style="border:1px solid black">
+<td>Expected Damage Taken</td>
+<td style="text-align:center"><sapn id="taken">0.00</sapn></td>
+</tr>
+</table>
+</div>
+
+</body>
+
+<script>
+const SKILL_POWER = 0;
+const COIN_POWER = 1;
+const COIN_NUMBER = 2;
+const HEAD_PROB = 3;
+const ADJUST = 4;
+
+const PROB = 0;
+const DEALT = 1;
+const TAKEN = 2;
+
+const sanitytToProbCoe = 0.01;
+
+function getIntById(id)
+{
+	return parseInt(Number(document.getElementById(id).value));
+}
+
+function main()
+{	
+	var result;
+	var user;
+	var userResist = Number(document.getElementById("userResist").value);
+	var userSkillPower = getIntById("userSkillPower");
+	var userCoinPower = getIntById("userCoinPower");
+	var userCoinNumber = getIntById("userCoinNumber");
+	var userSanity = getIntById("userSanity");
+	var userAdjust = getIntById("userAdjust");
+	var userHeadProb;
+	var enemy;
+	var enemyResist = Number(document.getElementById("enemyResist").value);
+	var enemySkillPower = getIntById("enemySkillPower");
+	var enemyCoinPower = getIntById("enemyCoinPower");
+	var enemyCoinNumber = getIntById("enemyCoinNumber");
+	var enemySanity = getIntById("enemySanity");
+	var enemyAdjust = getIntById("enemyAdjust");
+	var enemyHeadProb;
+	
+	if (userResist < 0)
+	{
+		userResist = 1;
+		document.getElementById("userResist").value = 1;
+	}
+	if (enemyResist < 0)
+	{
+		enemyResist = 1;
+		document.getElementById("enemyResist").value = 1;
+	}
+	userCoinNumber = limitValue(userCoinNumber, 0, abs(userCoinNumber), "userCoinNumber");
+	enemyCoinNumber = limitValue(enemyCoinNumber, 0, abs(enemyCoinNumber), "enemyCoinNumber");
+	userSanity = limitValue(userSanity, -45, 45, "userSanity");
+	enemySanity = limitValue(enemySanity, -45, 45, "enemySanity");
+
+	userHeadProb = 0.5 + sanitytToProbCoe * userSanity;
+	enemyHeadProb = 0.5 + sanitytToProbCoe * enemySanity;
+	user = [userSkillPower, userCoinPower, userCoinNumber, userHeadProb, userAdjust];
+	enemy = [enemySkillPower, enemyCoinPower, enemyCoinNumber, enemyHeadProb, enemyAdjust];
+		
+	result = getAllProb(user, enemy);
+	if (result[PROB] == "None" || result[PROB] == "One-Sided Attack")
+	{
+		document.getElementById("prob").innerHTML = result[PROB];
+	}
+	else
+	{
+		document.getElementById("prob").innerHTML = (result[PROB] * 100).toFixed(2)+"%";
+	}
+	document.getElementById("dealt").innerHTML = (result[DEALT] * enemyResist).toFixed(2);
+	document.getElementById("taken").innerHTML = (result[TAKEN] * userResist).toFixed(2);
+}
+
+function limitValue(val, min, max, html_id)
+{
+	if (min > max)
+	{
+		return val;
+	}
+
+	if (val < min)
+	{
+		document.getElementById(html_id).value = min;
+		return min;
+	}
+
+	if (val > max)
+	{
+		document.getElementById(html_id).value = max;
+		return max;
+	}
+
+	return val;
+}
+
+function getAllProb(user, enemy)
+{
+	var result= [0, 0, 0];
+	var result_userWin = [0, 0, 0];
+	var result_enemyWin = [0, 0, 0];
+	var enemy_fewer;
+	var user_fewer;
+	var FirstProb;
+
+	if (user[COIN_NUMBER] == 0 && enemy[COIN_NUMBER] == 0)
+	{
+		result[PROB] = "None";
+		return result;
+	}
+	
+	if (user[COIN_NUMBER] == 0)
+	{
+		result[PROB] = "One-Sided Attack";
+		result[TAKEN] = getExpectedDamage(enemy);
+		return result;
+	}
+	
+	if (enemy[COIN_NUMBER] == 0)
+	{
+		result[PROB] = "One-Sided Attack";
+		result[DEALT] = getExpectedDamage(user);
+		return result;
+	}
+	
+	FirstProb = getFirstProb(user, enemy);
+	if (FirstProb == -1)
+	{
+		result[PROB] = 0.5;
+		return result;
+	}
+	
+	
+	if (user[COIN_NUMBER] == 1 && enemy[COIN_NUMBER] == 1)
+	{
+		result[PROB] = FirstProb;
+		result[DEALT] = FirstProb * getExpectedDamage(user);
+		result[TAKEN] = (1 - FirstProb) * getExpectedDamage(enemy);
+		return result;
+	}
+
+	
+	if (user[COIN_NUMBER] == 1)
+	{
+		enemy_fewer = enemy.slice();
+		enemy_fewer[COIN_NUMBER] -= 1;
+		result_userWin = getAllProb(user, enemy_fewer);
+		
+		result[PROB] = FirstProb * result_userWin[PROB];
+		result[DEALT] = FirstProb * result_userWin[DEALT];
+		result[TAKEN] = FirstProb * result_userWin[TAKEN] + (1 - FirstProb) * getExpectedDamage(enemy);
+		return result;
+	}
+
+	
+	if (enemy[COIN_NUMBER] == 1)
+	{
+		user_fewer = user.slice();
+		user_fewer[COIN_NUMBER] -= 1;
+		result_enemyWin = getAllProb(user_fewer, enemy);
+		
+		result[PROB] = FirstProb + (1 - FirstProb) * result_enemyWin[PROB];
+		result[DEALT] = FirstProb * getExpectedDamage(user) + (1 - FirstProb) * result_enemyWin[DEALT];
+		result[TAKEN] = (1 - FirstProb) * result_enemyWin[TAKEN];
+		return result;
+	}
+	
+	enemy_fewer = enemy.slice();
+	enemy_fewer[COIN_NUMBER] -= 1;
+	result_userWin = getAllProb(user, enemy_fewer);
+
+	user_fewer = user.slice();
+	user_fewer[COIN_NUMBER] -= 1;
+	result_enemyWin = getAllProb(user_fewer, enemy);
+	
+	result[PROB] = FirstProb * result_userWin[PROB] + (1 - FirstProb) * result_enemyWin[PROB];
+	result[DEALT] = FirstProb * result_userWin[DEALT] + (1 - FirstProb) * result_enemyWin[DEALT];
+	result[TAKEN] = FirstProb * result_userWin[TAKEN] + (1 - FirstProb) * result_enemyWin[TAKEN];
+	return result;
+}
+
+function getFirstProb(user, enemy)
+{
+	var win = 0;
+	var lose = 0;
+	var case_prob;
+	var user_Power;
+	var user_SkillPower = user[SKILL_POWER];
+	var user_CoinPower = user[COIN_POWER];
+	var user_CoinNumber = user[COIN_NUMBER];
+	var user_HeadProb = user[HEAD_PROB];
+	var user_Adjust = user[ADJUST];
+	var enemy_Power;
+	var enemy_SkillPower = enemy[SKILL_POWER];
+	var enemy_CoinPower = enemy[COIN_POWER];
+	var enemy_CoinNumber = enemy[COIN_NUMBER];
+	var enemy_HeadProb = enemy[HEAD_PROB];
+	var enemy_Adjust = enemy[ADJUST];
+	
+	for (var u = 0; u <= user_CoinNumber; u++)
+	{
+		for (var e = 0; e <= enemy_CoinNumber; e++)
+		{
+			case_prob = getAllHeadProb(user_CoinNumber, u, user_HeadProb) * getAllHeadProb(enemy_CoinNumber, e, enemy_HeadProb);
+
+			user_Power = user_SkillPower + u * user_CoinPower + user_Adjust;
+			enemy_Power = enemy_SkillPower + e * enemy_CoinPower + enemy_Adjust;
+			
+			if (user_Power < 0)
+			{
+				user_Power = 0;
+			}
+			if (enemy_Power < 0)
+			{
+				enemy_Power = 0;
+			}
+			
+			if ( user_Power > enemy_Power )
+			{
+				win+= case_prob;
+			}
+			else if ( user_Power < enemy_Power )
+			{
+				lose+= case_prob;
+			}
+		}
+	}
+	
+	if ((win + lose) == 0)
+	{
+		return -1;
+	}
+	return win / (win + lose);
+}
+
+function getAllHeadProb(coin_num, head_num, head_prob)
+{
+	var tail_num = coin_num - head_num;
+	var tail_prob = 1 - head_prob;
+	var result;
+	result = combin(coin_num, head_num) * (head_prob ** head_num) * (tail_prob ** tail_num);
+	return result;
+}
+
+function getExpectedDamage(entity)
+{
+	var result = 0;
+	var skill = entity[SKILL_POWER];
+	var coin = entity[COIN_POWER];
+	var num = entity[COIN_NUMBER];
+	var prob = entity[HEAD_PROB];
+	var entity_head = entity.slice();
+	var entity_tail = entity.slice();
+
+	if (skill > 0)
+	{
+		result += (1 - prob) * skill;
+	}
+	if ((skill + coin) > 0)
+	{
+		result += prob * (skill + coin);
+	}
+
+	if (num == 1)
+	{
+		return result;
+	}
+
+	entity_head[COIN_NUMBER] -= 1;
+	entity_tail[COIN_NUMBER] -= 1;
+	entity_head[SKILL_POWER] += coin;
+
+	result += prob * getExpectedDamage(entity_head) + (1 - prob) * getExpectedDamage(entity_tail);
+	return result;
+}
+
+function combin(n, r)
+{
+	if (n < r || r < 0) return -1;
+	var numer = 1;
+	var denom = 1;
+	var result;
+	for (var i = 0; i < r; i++)
+	{
+		numer *= n - i;
+		denom *= i + 1;
+	}
+	result = numer / denom;
+	return result;
+}
+
+function abs(x)
+{
+	if (x < 0)
+	{
+		return -1 * x;
+	}
+	return x;
+}
+
+var enterPress = true;
+document.addEventListener("keydown", enterDown);
+function enterDown(event)
+{
+	if (enterPress && event.key == "Enter")
+	{
+		enterPress = false;
+		main();
+	}
+}
+document.addEventListener("keyup", enterUp);
+function enterUp(event)
+{
+	if (event.key == "Enter")
+	{
+		enterPress = true;
+	}
+}
+</script>
+</html>
